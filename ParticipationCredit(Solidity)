@@ -1,0 +1,28 @@
+// SPDX-License-Identifier: MIT
+pragma solidity >=0.4.22 <0.9.0;
+
+contract ParticipantCredit {
+    address public admin;
+    mapping(address => uint256) public credits;
+
+    // Set admin on deployment
+    constructor() public {
+        admin = msg.sender;
+    }
+
+    // Modifier to restrict access to admin only
+    modifier ownerOnly() {
+        require(msg.sender == admin, "Not a valid admin");
+        _;
+    }
+
+    // Admin grants credit to a student
+    function grantCredit(address _student) public ownerOnly {
+        credits[_student]++;
+    }
+
+    // Anyone can view the credits of a student
+    function getCredits(address _student) public view returns (uint256) {
+        return credits[_student];
+    }
+}
