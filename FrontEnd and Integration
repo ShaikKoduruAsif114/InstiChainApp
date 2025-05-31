@@ -1,0 +1,155 @@
+import React, { useState, useEffect } from 'react';
+import { BrowserProvider, Contract, isAddress } from 'ethers';
+
+// Declare window.ethereum for TypeScript
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
+
+// Replace with your contract ABI
+const contractABI = [
+  {
+    constant: false,
+    inputs: [{ internalType: 'address', name: '_student', type: 'address' }],
+    name: 'grantCredit',
+    outputs: [],
+    payable: false,
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    payable: false,
+    stateMutability: 'nonpayable',
+    type: 'constructor',
+  },
+  {
+    constant: true,
+    inputs: [],
+    name: 'admin',
+    outputs: [{ internalType: 'address', name: '', type: 'address' }],
+    payable: false,
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    constant: true,
+    inputs: [{ internalType: 'address', name: '', type: 'address' }],
+    name: 'credits',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    payable: false,
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    constant: true,
+    inputs: [{ internalType: 'address', name: '_student', type: 'address' }],
+    name: 'getCredits',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    payable: false,
+    stateMutability: 'view',
+    type: 'function',
+  },
+];
+
+// Replace with your deployed contract address on Ganache
+const contractAddress = '0x84931844357E7f023C426bc33e7c4a85A5adCf5C';
+
+export default function CreditManager() {
+  const [provider, setProvider] = useState<BrowserProvider | null>(null);
+  const [contract, setContract] = useState<Contract | null>(null);
+  const [account, setAccount] = useState<string>('');
+  const [studentAddress, setStudentAddress] = useState<string>('');
+  const [credits, setCredits] = useState<number>(0);
+  const [error, setError] = useState<string>('');
+
+  useEffect(() => {
+    const init = async () => {
+      if (window.ethereum) {
+        try {
+          const _provider = new BrowserProvider(window.ethereum);
+          const signer = await _provider.getSigner();
+          const _contract = new Contract(contractAddress, contractABI, signer);
+
+          setProvider(_provider);
+          setContract(_contract);
+
+          // Request accounts from MetaMask
+          const accounts: string[] = await window.ethereum.request({
+            method: 'eth_requestAccounts',
+          });
+          setAccount(accounts[0]);
+          setError('');
+        } catch (err) {
+          setError('Error connecting to MetaMask');
+          console.error(err);
+        }
+      } else {
+        setError('Please install MetaMask');
+      }
+    };
+    init();
+  }, []);
+
+  const handleGetCredits = async () => {
+    if (!contract) return;
+    try {
+      const result = await contract.getCredits(studentAddress);
+      // result is a BigInt in ethers v6
+      setCredits(Number(result));
+      setError('');
+    } catch (err) {
+      setError('Error fetching credits');
+      console.error(err);
+    }
+  };
+
+  const handleGrantCredit = async () => {
+    if (!contract) return;
+    try {
+      setError('Processing transaction...');
+      const tx = await contract.grantCredit(studentAddress);
+      await tx.wait();
+      setError('Transaction confirmed');
+      handleGetCredits(); // Refresh credits
+    } catch (err: any) {
+      setError(Transaction failed: ${err.reason || err.message});
+      console.error(err);
+    }
+  };
+
+  return (
+    <div style={{ padding: 20 }}>
+      <h1>InstiChain: Participation Credits</h1>
+      <p>
+        Connected Account: <b>{account || 'Not connected'}</b>
+      </p>
+
+      <div style={{ marginBottom: 10 }}>
+        <input
+          type="text"
+          placeholder="Student Ethereum Address"
+          value={studentAddress}
+          onChange={(e) => setStudentAddress(e.target.value)}
+          style={{ width: 300, marginRight: 10, padding: 5 }}
+        />
+
+        <button onClick={handleGetCredits} style={{ marginRight: 10 }}>
+          Get Credits
+        </button>
+
+        <button
+          onClick={handleGrantCredit}
+          disabled={!isAddress(studentAddress) || !account}
+        >
+          Grant Credit
+        </button>
+      </div>
+
+      {credits > 0 && <p>Credits: {credits}</p>}
+      {error && <p style={{ color: 'red' }}>{error}</p>}
+    </div>
+  );
+}
